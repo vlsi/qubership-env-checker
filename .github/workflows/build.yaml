@@ -63,15 +63,17 @@ jobs:
           no-cache: true
           context: ${{ matrix.component.context }}
           file: ${{ matrix.component.file }}
-          platforms: linux/amd64
-          push: ${{ github.repository_owner == 'Netcracker' }}
+          platforms: linux/amd64,linux/arm64
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          outputs: |
+            type=oci,dest=image.tar
+            type=registry,push=true
           provenance: false
 
       - name: Generate & submit SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          file: ./image.tar
           dependency-snapshot: true # <-- pushes to GitHub Dependency Graph
           artifact-name: sbom.spdx.json
           registry-username: ${{ github.actor }}
@@ -81,7 +83,7 @@ jobs:
       - name: Trivy scan (image → SARIF)
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          input: ./image.tar
           format: sarif
           output: trivy-results.sarif
           vuln-type: 'os,library'
@@ -97,7 +99,7 @@ jobs:
         uses: anchore/scan-action@v6
         id: grype
         with:
-          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          path: ./image.tar
           fail-build: false # or true + severity-cutoff: critical
           output-format: sarif
 
